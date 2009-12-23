@@ -102,6 +102,8 @@ Connection = function(server, socket) {
       return;
     }
 
+    // Data parsing
+
     sys.puts('received!');
   };
 
@@ -148,7 +150,7 @@ Connection = function(server, socket) {
     data = data.replace('__ORIGIN__',   origin);
     data = data.replace('__RESOURCE__', resource);
 
-    self.send(data);
+    self.socket.send(data);
     self.hasDoneCoolGuyHandshake = true; // <-- Cool guy B-)
   };
 

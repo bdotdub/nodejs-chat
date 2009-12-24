@@ -60,7 +60,8 @@ ChatServer = function(options) {
 };
 
 Connection = function(server, socket) {
-  this.hasDoneCoolGuyHandshake = false;
+  this.data                     = '';
+  this.hasDoneCoolGuyHandshake  = false;
 
   var self = this;
 
@@ -70,7 +71,7 @@ Connection = function(server, socket) {
     self.socket = socket;
 
     // Socket setup
-    self.socket.setEncoding("utf8");
+    self.socket.setEncoding('utf8');
     self.socket.setNoDelay(true); // disabling Nagle's algorithm is encouraged for real time transmissions
     self.socket.setTimeout(0);
 
@@ -81,37 +82,49 @@ Connection = function(server, socket) {
   }
 
   this.connect = function() {
-    sys.puts('connected!');
+    sys.puts('Connected');
   };
 
   this.disconnect = function() {
+    sys.puts('Disconnecting');
     self.server.removeConnection(self);
     self.socket.close();
   }
 
   this.eof = function() {
-    sys.puts('eof!');
+    sys.puts('EOF Received');
     self.disconnect();
   };
 
   this.receive = function(data) {
-    sys.puts('======================');
-    sys.puts('Data received: ' + data);
     if (!self.hasDoneCoolGuyHandshake) {
       self.thenDoIt(data);
       return;
     }
 
-    // Data parsing
+    sys.puts('Received data');
+    if (data.indexOf('\ufffd') != -1) {
+      var completeData = self.data + data.replace('\ufffd', '');
+      if (completeData[0] != '\u0000') {
+        sys.puts('Data framed incorrectly');
+        self.disconnect();
+        return;
+      }
 
-    sys.puts('received!');
+      sys.puts('Complete Data:\n\t' + completeData);
+      self.send(completeData);
+      self.data = '';
+    }
+    else {
+      sys.puts('Uncompleted data chunk');
+      self.data += data;
+    }
   };
 
   this.send = function(data) {
     try {
       // Funkalicious
-      sys.puts('----------------------');
-      sys.puts('Data sending: ' + data);
+      sys.puts('Sending Data:\n\t' + data);
       self.socket.send('\u0000' + data + '\uffff');
     }
     catch(e) {

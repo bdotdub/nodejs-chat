@@ -1,10 +1,17 @@
 // Heavily borrowed from dhotson (http://dhotson.tumblr.com/post/271733389/a-simple-chat-server-in-node-js) and
 // Guille (http://github.com/Guille/node.websocket.js/blob/master/websocket.js)
 
-var sys = require("sys");
-var tcp = require("tcp");
+var sys = require('sys');
+var tcp = require('tcp');
+
+var log   = require('./log');
+// log.level = log.DEBUG;
 
 // Should break this out
+Array.prototype.each = function(fn) {
+  for (var i = 0; i < this.length; i++) fn(this[i]);
+}
+
 Array.prototype.remove = function(e) {
   for (var i = 0; i < this.length; i++)
     if (e == this[i]) return this.splice(i, 1);
@@ -32,17 +39,27 @@ WebSocket = {
 
 // This is the class that will be running
 ChatServer = function(options) {
-  this.connections  = [];
-  this.server       = null;
+  this.connections    = [];
+  this.nextIdToAssign = 0;
+  this.server         = null;
 
   var self = this;
 
   this.addConnection = function(connection) {
     self.connections.push(connection);
+    connection.id = self.nextIdToAssign++;
+    log.debug('Connections: ' + self.connections.length);
   };
 
   this.removeConnection = function(connection) {
     self.connections.remove(connection);
+    log.debug('Connections: ' + self.connections.length);
+  };
+
+  this.say = function(connection, message) {
+    self.connections.each(function(conn) {
+      conn.send('Connection ' + connection.id + ' said ' + message);
+    });
   };
 
   this.start = function() {
@@ -62,6 +79,8 @@ ChatServer = function(options) {
 Connection = function(server, socket) {
   this.data                     = '';
   this.hasDoneCoolGuyHandshake  = false;
+  this.id                       = null;
+  this.nick                     = null;
 
   var self = this;
 
@@ -82,19 +101,28 @@ Connection = function(server, socket) {
   }
 
   this.connect = function() {
-    sys.puts('Connected');
-  };
+    log.info(self.logFormat('New user connected'));
+  }
 
   this.disconnect = function() {
-    sys.puts('Disconnecting');
+    log.info(self.logFormat('Disconnecting connection'));
     self.server.removeConnection(self);
     self.socket.close();
   }
 
   this.eof = function() {
-    sys.puts('EOF Received');
+    log.info(self.logFormat('Received EOF from Connection'));
     self.disconnect();
   };
+
+  this.handleData = function(data) {
+    log.debug(self.logFormat('handleData: ' + data));
+    self.server.say(self, data);
+  };
+
+  this.logFormat = function(message) {
+    return '[' + self.id + '] ' + message;
+  }
 
   this.receive = function(data) {
     if (!self.hasDoneCoolGuyHandshake) {
@@ -102,21 +130,21 @@ Connection = function(server, socket) {
       return;
     }
 
-    sys.puts('Received data');
+    log.debug(self.logFormat('Received data: ' + data));
     if (data.indexOf('\ufffd') != -1) {
       var completeData = self.data + data.replace('\ufffd', '');
       if (completeData[0] != '\u0000') {
-        sys.puts('Data framed incorrectly');
+        log.error(self.logFormat('Data framed incorrectly'));
         self.disconnect();
         return;
       }
 
-      sys.puts('Complete Data:\n\t' + completeData);
-      self.send(completeData);
+      log.info(self.logFormat('Complete Data Received: ' + completeData));
+      self.handleData(completeData);
       self.data = '';
     }
     else {
-      sys.puts('Uncompleted data chunk');
+      log.debug(self.logFormat('Imcomplete data chunk'));
       self.data += data;
     }
   };
@@ -124,8 +152,8 @@ Connection = function(server, socket) {
   this.send = function(data) {
     try {
       // Funkalicious
-      sys.puts('Sending Data:\n\t' + data);
-      self.socket.send('\u0000' + data + '\uffff');
+      log.debug(self.logFormat('Sending Data: ' + data));
+      self.socket.send('\u0000' + JSON.stringify(data) + '\uffff');
     }
     catch(e) {
       self.disconnect();
@@ -136,6 +164,8 @@ Connection = function(server, socket) {
   this.thenDoIt = function(data) {
     var headers = data.split('\r\n');
     var matches = [];
+
+    log.debug(self.logFormat('Starting handshaking'));
 
     if (headers.length == 0) {
       // http://www.youtube.com/watch?v=vF4iWIE77Ts

@@ -1,0 +1,32 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, Verdana, Arial, sans-serif;
+}
+
+#debug {
+  background-color: #F0F0F0;
+  font-size: 12px;
+  height: 250px;
+  overflow: auto;
+  padding: 10px;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 250px;
+}
+
+#chat_form {
+  bottom: 5px;
+  position: absolute;
+  width: 100%;
+}
+
+#chat_form #chat_form_input {
+  font-size: 16px;
+  padding: 5px;
+  width: 98%;
+}

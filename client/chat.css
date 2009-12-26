@@ -24,7 +24,7 @@ body {
 #chat_form {
   bottom: 5px;
   position: absolute;
-  width: 100%;
+  width: 99%;
 }
 
 #chat_form #chat_form_input {
@@ -50,7 +50,7 @@ body {
 }
 
 .message {
-  width: 100%;
+  width: 95%;
 }
 
 .me, .nick {

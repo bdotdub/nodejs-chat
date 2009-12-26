@@ -5,7 +5,7 @@ var sys = require('sys');
 var tcp = require('tcp');
 
 var log   = require('./log');
-log.level = log.INFO;
+log.level = log.DEBUG;
 
 // Should break this out
 Array.prototype.each = function(fn) {
@@ -43,6 +43,7 @@ this.WebSocket = {
 // This is the class that will be running
 this.ChatServer = function(options) {
   this.connections    = [];
+  this.history        = [];
   this.nextIdToAssign = 0;
   this.server         = null;
 
@@ -54,12 +55,29 @@ this.ChatServer = function(options) {
     log.debug('Connections: ' + self.connections.length);
   };
 
+  // Broadcast a message to all clients. The advantage of having this
+  // is that we can keep track of all message that have come through and
+  // replay the last N messages when new clients log on.
   this.broadcast = function(fn) {
     self.connections.each(function(connection) {
      var data = fn(connection);
      connection.send(data);
     })
+
+    self.history.push(fn({}));
   };
+
+  this.lastNMessages = function(N) {
+    if (self.history.length < N) {
+      N = self.history.length;
+    }
+
+    var lastNMessages = []
+    for (var idx = self.history.length - N; idx < self.history.length; ++idx) {
+      lastNMessages.push(self.history[idx]);
+    }
+    return lastNMessages;
+  }
 
   this.removeConnection = function(connection) {
     self.connections.remove(connection);
@@ -246,6 +264,7 @@ this.Connection.prototype.handlers = {
     log.debug(connection.logFormat('Assigning nick: ' + data));
     connection.nick = data;
 
+    connection.send(['lastMessage', connection.server.lastNMessages(5)]);
     connection.server.broadcast(function(conn) {
       return ['status', { 'nick': connection.nick, 'status': 'on' }];
     })

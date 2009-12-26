@@ -1,6 +1,7 @@
 $(document).ready(function(){
   $('#sign_in_form').submit(NodeJsChat.signIn);
   $('#chat_form').submit(NodeJsChat.onformsubmit);
+  $(window).unload(function () { if (NodeJsChat.ws) NodeJsChat.ws.close(); });
 });
 
 NodeJsChat = {
@@ -21,6 +22,7 @@ NodeJsChat = {
 
   onclose: function() {
     NodeJsChat.debug('socket closed');
+    alert('Whoops! Looks like you lost internet connection or the server went down');
   },
 
   onformsubmit: function() {
@@ -75,6 +77,13 @@ NodeJsChat = {
 };
 
 NodeJsChat.handlers = {
+  lastMessage: function(data) {
+    for (var idx = 0; idx < data.length; ++idx) {
+      var message = data[idx];
+      NodeJsChat.handlers[message[0]](message[1]);
+    }
+  },
+
   said: function(data) {
     var message = '<div class="message">';
 

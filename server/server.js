@@ -5,7 +5,7 @@ var sys = require('sys');
 var tcp = require('tcp');
 
 var log   = require('./log');
-// log.level = log.DEBUG;
+log.level = log.INFO;
 
 // Should break this out
 Array.prototype.each = function(fn) {
@@ -17,7 +17,10 @@ Array.prototype.remove = function(e) {
     if (e == this[i]) return this.splice(i, 1);
 }
 
-WebSocket = {
+// This is kind of ugly. Should get rid of it
+var module = this;
+
+this.WebSocket = {
   requestHeaders: [
     /^GET (\/[^\s]*) HTTP\/1\.1$/,
     /^Upgrade: WebSocket$/,
@@ -38,7 +41,7 @@ WebSocket = {
 }
 
 // This is the class that will be running
-ChatServer = function(options) {
+this.ChatServer = function(options) {
   this.connections    = [];
   this.nextIdToAssign = 0;
   this.server         = null;
@@ -51,14 +54,29 @@ ChatServer = function(options) {
     log.debug('Connections: ' + self.connections.length);
   };
 
+  this.broadcast = function(fn) {
+    self.connections.each(function(connection) {
+     var data = fn(connection);
+     connection.send(data);
+    })
+  };
+
   this.removeConnection = function(connection) {
     self.connections.remove(connection);
     log.debug('Connections: ' + self.connections.length);
+
+    self.broadcast(function(conn) {
+      return ['status', { 'nick': connection.nick, 'status': 'off' }];
+    });
   };
 
   this.say = function(connection, message) {
-    self.connections.each(function(conn) {
-      conn.send('Connection ' + connection.id + ' said ' + message);
+    self.broadcast(function(conn) {
+      return ['said', {
+        'isSelf': (conn.id == connection.id),
+        'message': message,
+        'nick': connection.nick
+      }];
     });
   };
 
@@ -68,7 +86,7 @@ ChatServer = function(options) {
       // Everytime a new socket is opened, create a new
       // connection object representing a client.
       // Push into member variable
-      var connection = new Connection(self, socket);
+      var connection = new module.Connection(self, socket);
       self.addConnection(connection);
     });
 
@@ -76,7 +94,7 @@ ChatServer = function(options) {
   };
 };
 
-Connection = function(server, socket) {
+this.Connection = function(server, socket) {
   this.data                     = '';
   this.hasDoneCoolGuyHandshake  = false;
   this.id                       = null;
@@ -98,6 +116,9 @@ Connection = function(server, socket) {
     self.socket.addListener('connect',  self.connect);
     self.socket.addListener('eof',      self.eof);
     self.socket.addListener('receive',  self.receive);
+
+    // Hooking up handlers
+    // self.handlers = self.handlers();
   }
 
   this.connect = function() {
@@ -115,9 +136,26 @@ Connection = function(server, socket) {
     self.disconnect();
   };
 
-  this.handleData = function(data) {
-    log.debug(self.logFormat('handleData: ' + data));
-    self.server.say(self, data);
+  this.handleData = function(rawData) {
+    log.debug(self.logFormat('handleData: ' + rawData));
+    var jsonData = JSON.parse(rawData);
+
+    if (typeof(jsonData) != 'object' || jsonData.length != 2) {
+      log.fatal('Message format wrong: ' + sys.inspect(jsonData));
+      log.fatal('Message format wrong: ' + rawData);
+      return;
+    }
+
+    var action  = jsonData[0];
+    var data    = jsonData[1];
+
+    if (self.handlers[action]) {
+      self.handlers[action](self, data);
+    }
+    else {
+      log.warn('Did not find handler for "' + action + '"');
+    }
+
   };
 
   this.logFormat = function(message) {
@@ -139,6 +177,9 @@ Connection = function(server, socket) {
         return;
       }
 
+      // Sanitize it some more
+      completeData = completeData.replace('\u0000', '');
+
       log.info(self.logFormat('Complete Data Received: ' + completeData));
       self.handleData(completeData);
       self.data = '';
@@ -152,7 +193,7 @@ Connection = function(server, socket) {
   this.send = function(data) {
     try {
       // Funkalicious
-      log.debug(self.logFormat('Sending Data: ' + data));
+      log.debug(self.logFormat('Sending Data: ' + JSON.stringify(data)));
       self.socket.send('\u0000' + JSON.stringify(data) + '\uffff');
     }
     catch(e) {
@@ -173,7 +214,7 @@ Connection = function(server, socket) {
     }
 
     for (var index = 0; index < headers.length; ++index) {
-      var match = headers[index].match(WebSocket.requestHeaders[index]);
+      var match = headers[index].match(module.WebSocket.requestHeaders[index]);
       if (match && match.length > 1) {
         matches.push(match[1]);
       }
@@ -188,7 +229,7 @@ Connection = function(server, socket) {
     var host      = matches[1];
     var origin    = matches[2];
 
-    var data = WebSocket.responseHeaders.join('\r\n');
+    var data = module.WebSocket.responseHeaders.join('\r\n');
     data = data.replace('__HOST__',     host);
     data = data.replace('__ORIGIN__',   origin);
     data = data.replace('__RESOURCE__', resource);
@@ -200,5 +241,18 @@ Connection = function(server, socket) {
   self.init(server, socket);
 };
 
-var server = new ChatServer();
-server.start();
+this.Connection.prototype.handlers = {
+  assignNick: function(connection, data) {
+    log.debug(connection.logFormat('Assigning nick: ' + data));
+    connection.nick = data;
+
+    connection.server.broadcast(function(conn) {
+      return ['status', { 'nick': connection.nick, 'status': 'on' }];
+    })
+  },
+
+  say: function(connection, data) {
+    connection.server.say(connection, data);
+  }
+};
+

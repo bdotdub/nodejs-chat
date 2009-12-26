@@ -6,11 +6,18 @@
     <script src='chat.js' type='text/javascript'></script>
   </head>
   <body>
-    <form id='chat_form'>
-      <input id='chat_form_input' type='text' />
-    </form>
+    <div id='sign_in'>
+      <form id='sign_in_form'>
+        <input id='sign_in_form_input' type='text' />
+        <input type='submit' value='Sign in!' />
+      </form>
+    </div>
     <div id="debug"></div>
-    <div id="msg"></div>
+    <div id="messages">
+    </div>
+    <form id='chat_form'>
+      <input id='chat_form_input' type='text' disabled />
+    </form>
   </body>
 </html>
 

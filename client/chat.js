@@ -1,9 +1,10 @@
 $(document).ready(function(){
-  NodeJsChat.connect();
+  $('#sign_in_form').submit(NodeJsChat.signIn);
   $('#chat_form').submit(NodeJsChat.onformsubmit);
 });
 
 NodeJsChat = {
+  nick: null,
   ws: null,
 
   connect: function() {
@@ -33,19 +34,78 @@ NodeJsChat = {
   },
 
   onmessage: function(evt) {
-    $("#msg").append("<p>"+JSON.parse(evt.data)+"</p>");
+    var jsonData = JSON.parse(evt.data);
+
+    var action  = jsonData[0];
+    var data    = jsonData[1];
+
+    if (NodeJsChat.handlers[action]) {
+      NodeJsChat.handlers[action](data);
+    }
+    else {
+      // This should be in a separate function.
+      $('#messages').append('<tr><td cospan="2">Whoops, bad message from the server</td></tr>');
+    }
   },
 
   onopen: function() {
     NodeJsChat.debug('Connected...');
+    NodeJsChat.send([ 'assignNick',  NodeJsChat.nick ]);
   },
 
   say: function(message) {
-    NodeJsChat.ws.send(message);
+    NodeJsChat.send([ 'say',  message ]);
+    return false;
+  },
+
+  send: function(data) {
+    var dataStr = JSON.stringify(data);
+    NodeJsChat.ws.send(dataStr);
+  },
+
+  signIn: function() {
+    NodeJsChat.connect();
+    NodeJsChat.nick = $('#sign_in_form_input').val()
+
+    $('#sign_in').fadeOut({ duration: 'fast' });
+    $('#chat_form_input').removeAttr('disabled');
+
     return false;
   }
 };
 
 NodeJsChat.handlers = {
+  said: function(data) {
+    var message = '<div class="message">';
 
+    var prefix  = '';
+    var tdClass = '';
+    if (data.isSelf) {
+      prefix  = 'You:';
+      tdClass = 'me';
+    }
+    else {
+      prefix  = data.nick + ':';
+      tdClass = 'nick';
+    }
+    message     += '<div class="' + tdClass + '">';
+    message     += prefix
+    message     += '</div>';
+
+    message     += '<div class="message">';
+    message     += data.message;
+    message     += '</div>';
+
+    message     += '</div>';
+
+    $('#messages').append(message);
+  },
+
+  'status': function(data) {
+    var nick = data.nick;
+    var stat = data['status'];
+
+    var message = '<div class="status">' + nick + ' just logged ' + stat + '</div>';
+    $('#messages').append(message);
+  }
 };

@@ -69,8 +69,10 @@ NodeJsChat = {
     NodeJsChat.connect();
     NodeJsChat.nick = $('#sign_in_form_input').val()
 
+    $('#sign_in_form_input').blur();
     $('#sign_in').fadeOut({ duration: 'fast' });
     $('#chat_form_input').removeAttr('disabled');
+    $('#sign_in').remove();
 
     return false;
   }

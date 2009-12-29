@@ -1,11 +1,16 @@
 $(document).ready(function(){
   $('#sign_in_form').submit(NodeJsChat.signIn);
   $('#chat_form').submit(NodeJsChat.onformsubmit);
-  $(window).unload(function () { if (NodeJsChat.ws) NodeJsChat.ws.close(); });
+  $(window).unload(function () {
+    if (NodeJsChat.ws) NodeJsChat.ws.close();
+    // So ugly :(
+    NodeJsChat.windowClosing = true;
+  });
 });
 
 NodeJsChat = {
   nick: null,
+  windowClosing: false,
   ws: null,
 
   connect: function() {
@@ -22,7 +27,9 @@ NodeJsChat = {
 
   onclose: function() {
     NodeJsChat.debug('socket closed');
-    alert('Whoops! Looks like you lost internet connection or the server went down');
+    if (!NodeJsChat.windowClosing) {
+      alert('Whoops! Looks like you lost internet connection or the server went down');
+    }
   },
 
   onformsubmit: function() {

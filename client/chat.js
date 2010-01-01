@@ -119,7 +119,7 @@ NodeJsChat.handlers = {
     $('#messages').append(message);
   },
 
-  'status': function(data) {
+  status: function(data) {
     var nick = data.nick;
     var stat = data['status'];
 

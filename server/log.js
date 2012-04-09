@@ -1,5 +1,5 @@
 // Super simplistic logger
-var sys = require('sys');
+var sys = require('util');
 
 this.FATAL  = 4;
 this.ERROR  = 3;

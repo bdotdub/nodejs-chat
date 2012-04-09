@@ -1,8 +1,8 @@
 // Heavily borrowed from dhotson (http://dhotson.tumblr.com/post/271733389/a-simple-chat-server-in-node-js) and
 // Guille (http://github.com/Guille/node.websocket.js/blob/master/websocket.js)
 
-var sys = require('sys');
-var tcp = require('tcp');
+var sys = require('util');
+var tcp = require('net');
 
 var log   = require('./log');
 log.level = log.DEBUG;
